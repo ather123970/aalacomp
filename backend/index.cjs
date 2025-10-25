@@ -30,17 +30,10 @@ const cookieParser = require('cookie-parser');
 const app = express();
 // Trust proxy so req.protocol/hostname respect X-Forwarded-* when behind load balancers/proxies
 app.set('trust proxy', true);
-
-// Serve static files from the dist directory
-app.use(express.static(path.join(__dirname, '..', 'dist')));
-
-// Handle client-side routing by serving index.html for all non-api routes
-app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
-});
+// Note: static file serving is mounted after API routes and middleware below
+// to ensure API middleware (CORS, body parsing, auth) runs first. See
+// the end of this file where `dist` is served and the client-side fallback
+// is implemented.
 
 // Flexible CORS: echo origin dynamically and allow credentials so cookies/auth headers work.
 // This avoids hardcoding origins and supports HTTP and HTTPS across hosting platforms.
@@ -717,7 +710,22 @@ app.get('/api/admin/stats', (req, res) => {
 
 // Endpoint to increment AI-open counter (called by frontend when AI opens product via window.aalaaiOpen)
 // AI open tracking endpoint removed.
+
+// Serve static files from the dist directory and provide client-side routing
+// fallback. This is mounted after all API routes so it doesn't interfere with
+// API handling.
 const PORT = process.env.PORT || 3000;
+
+const DIST_DIR = path.join(__dirname, '..', 'dist');
+app.use(express.static(DIST_DIR));
+app.get('*', (req, res, next) => {
+  // Let API routes pass through
+  if (req.path.startsWith('/api')) return next();
+  const indexPath = path.join(DIST_DIR, 'index.html');
+  if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+  // If index.html is missing, return a clear 404 so logs are actionable
+  res.status(404).send('Not found');
+});
 
 async function startServer() {
   try {
