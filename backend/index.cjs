@@ -721,18 +721,23 @@ const PORT = process.env.PORT || 3000;
 
 async function startServer() {
   try {
-    const MONGO_URI =
-      process.env.MONGO_URI ||
-      process.env.MONGO ||
-      'mongodb://127.0.0.1:27017/Aalacomputer';
+    // Prefer explicit environment variable. Do NOT default to a local Mongo instance
+    // in production — Render and other hosts should provide MONGO_URI. If no
+    // MONGO_URI is provided we'll skip attempting to connect to avoid noisy
+    // ECONNREFUSED errors when there's no DB available.
+    const MONGO_URI = process.env.MONGO_URI || process.env.MONGO || null;
 
     if (MONGO_URI) {
-      mongoose.set('bufferCommands', false);
-      await mongoose.connect(MONGO_URI, {
-        connectTimeoutMS: 5000,
-        serverSelectionTimeoutMS: 5000,
-      });
-      console.log('[db] MongoDB connected');
+      try {
+        mongoose.set('bufferCommands', false);
+        await mongoose.connect(MONGO_URI, {
+          connectTimeoutMS: 5000,
+          serverSelectionTimeoutMS: 5000,
+        });
+        console.log('[db] MongoDB connected');
+      } catch (e) {
+        console.error('[db] MongoDB connection failed:', e && (e.stack || e.message));
+      }
     } else {
       console.log('[db] No MONGO_URI configured; skipping DB connect');
     }
