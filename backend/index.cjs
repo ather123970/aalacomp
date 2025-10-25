@@ -27,9 +27,20 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const app=express()
+const app = express();
 // Trust proxy so req.protocol/hostname respect X-Forwarded-* when behind load balancers/proxies
 app.set('trust proxy', true);
+
+// Serve static files from the dist directory
+app.use(express.static(path.join(__dirname, '..', 'dist')));
+
+// Handle client-side routing by serving index.html for all non-api routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'));
+});
 
 // Flexible CORS: echo origin dynamically and allow credentials so cookies/auth headers work.
 // This avoids hardcoding origins and supports HTTP and HTTPS across hosting platforms.
